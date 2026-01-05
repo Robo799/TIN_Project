@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Survival Game</title>
+    <link rel="stylesheet" href="/stylesheets/style.css" />
+</head>
+<body>
+<div id="wrap">
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+    <div id="ui">
+        <button id="startBtn">Start</button>
+        <button id="restartBtn" style="display:none;">Restart</button>
+        <button id="scoresToggleBtn">Scores</button>
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> SFX</label>
+    </div>
+
+    <div id="submitPanel" style="display:none;">
+        <input id="nameInput" placeholder="Your name (2-20)" maxlength="20" />
+        <button id="submitBtn">Submit score</button>
+        <div id="submitMsg"></div>
+    </div>
+
+    <div id="highscores" style="display:none;">
+        <h3>High Scores</h3>
+        <div>
+            <button id="prevPageBtn">Prev</button>
+            <span id="pageInfo"></span>
+            <button id="nextPageBtn">Next</button>
+        </div>
+        <div id="highscoresList"></div>
+    </div>
+</div>
+
+<script src="/javascripts/game.js"></script>
+</body>
+</html>

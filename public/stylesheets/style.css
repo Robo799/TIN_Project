@@ -1,0 +1,155 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #0b0f19;
+    color: #e7e7e7;
+    font-family: Arial, sans-serif;
+}
+
+#wrap {
+    min-height: 100%;
+    display: grid;
+    place-items: center;
+    padding: 18px 12px;
+    box-sizing: border-box;
+}
+
+#gameCanvas {
+    background: #0f1628;
+    border: 1px solid #233155;
+    border-radius: 10px;
+}
+
+#ui {
+    width: 820px;
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+#ui button {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid #2a3a66;
+    background: #101a32;
+    color: #e7e7e7;
+    cursor: pointer;
+}
+
+#ui button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#ui label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    opacity: 0.95;
+}
+
+#ui input[type="checkbox"] {
+    transform: translateY(1px);
+}
+
+#submitPanel {
+    width: 820px;
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+#nameInput {
+    flex: 1;
+    min-width: 220px;
+}
+
+input, button {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #2a3a66;
+    background: #101a32;
+    color: #e7e7e7;
+}
+
+input::placeholder {
+    color: rgba(231, 231, 231, 0.6);
+}
+
+#submitMsg {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.error {
+    color: #ffb4b4;
+    opacity: 1;
+}
+
+#highscores {
+    width: 820px;
+    margin-top: 12px;
+    border: 1px solid #233155;
+    border-radius: 12px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+#highscores h3 {
+    margin: 0;
+    padding: 10px 12px;
+    background: #101a32;
+    border-bottom: 1px solid #233155;
+    font-size: 16px;
+}
+
+#highscores > div {
+    padding: 10px 12px;
+}
+
+#highscoresList {
+    padding: 0 12px 12px 12px;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 50px 1fr 120px 120px 180px;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #1d294a;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.row:last-child {
+    border-bottom: none;
+}
+
+.small {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+/* Make it usable on smaller screens */
+@media (max-width: 880px) {
+    #ui, #submitPanel, #highscores {
+        width: 100%;
+    }
+
+    #gameCanvas {
+        width: 100%;
+        height: auto;
+    }
+
+    .row {
+        grid-template-columns: 40px 1fr 90px 80px 140px;
+    }
+}
