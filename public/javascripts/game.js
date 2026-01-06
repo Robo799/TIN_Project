@@ -1,6 +1,11 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+const titleScreen = document.getElementById("titleScreen");
+const gameScreen = document.getElementById("gameScreen");
+const scoreScreen = document.getElementById("scoreScreen");
+const finalStats = document.getElementById("finalStats");
+const backToTitleBtn = document.getElementById("backToTitleBtn");
 const startBtn = document.getElementById("startBtn");
 const restartBtn = document.getElementById("restartBtn");
 const scoresToggleBtn = document.getElementById("scoresToggleBtn");
@@ -30,12 +35,15 @@ ASSETS.over.src = "/images/over.png";
 
 const audio = {
     music: new Audio("/images/music.mp3"),
-    hit: new Audio("/images/hit.wav"),
     over: new Audio("/images/over.mp3"),
+    near: new Audio("/images/near.mp3"),
 };
 audio.music.loop = true;
-audio.music.volume = 0.35;
-audio.over.volume = 0.6;
+audio.music.volume = 0.2;
+audio.over.volume = 0.5;
+let nearBeepCooldownMs = 0;
+const NEAR_DIST_PX = 120;
+const NEAR_BEEP_MS = 500;
 
 function safePlay(aud) {
     if (!aud) return;
@@ -45,7 +53,7 @@ function safePlay(aud) {
     } catch {}
 }
 function updateMusic() {
-    if (!musicToggle || !audio.music) return;
+    if (!musicToggle || !audio.music || STATE.name !== "PLAY") return;
     if (musicToggle.checked) {
         audio.music.play().catch(() => {});
     } else {
@@ -53,9 +61,28 @@ function updateMusic() {
         audio.music.currentTime = 0;
     }
 }
-function playHit() {
+
+function updateNearSfx(dt) {
+    if (STATE.name !== "PLAY") return;
     if (sfxToggle && !sfxToggle.checked) return;
-    safePlay(audio.hit);
+
+    nearBeepCooldownMs -= dt * 1000;
+    if (nearBeepCooldownMs > 0) return;
+
+    let minD = Infinity;
+    for (const e of GAME.enemies) {
+        const d = Math.hypot(GAME.player.x - e.x, GAME.player.y - e.y);
+        if (d < minD) minD = d;
+    }
+
+    if (minD <= NEAR_DIST_PX) {
+        const factor = clamp(minD / NEAR_DIST_PX, 0.2, 1.0);
+        if (audio.near) audio.near.volume = 0.15 + (1 - factor) * 0.35;
+        safePlay(audio.near);
+        nearBeepCooldownMs = NEAR_BEEP_MS * factor;
+    } else {
+        nearBeepCooldownMs = 120;
+    }
 }
 
 if (musicToggle) musicToggle.addEventListener("change", updateMusic);
@@ -90,6 +117,18 @@ function resetGame() {
     GAME.level = 1;
     GAME.spawnTimerMs = 0;
     GAME.over = false;
+    nearBeepCooldownMs = 0;
+}
+
+function showScreen(which) {
+    if (!titleScreen || !gameScreen || !scoreScreen) return;
+    titleScreen.classList.toggle("hidden", which !== "TITLE");
+    gameScreen.classList.toggle("hidden", which !== "GAME");
+    scoreScreen.classList.toggle("hidden", which !== "SCORE");
+    const audioControls = document.getElementById("audioControls");
+    if (audioControls) {
+        audioControls.classList.toggle("hidden", which === "SCORE");
+    }
 }
 
 function setScreen(name) {
@@ -99,8 +138,6 @@ function setScreen(name) {
     if (restartBtn) restartBtn.style.display = name === "TITLE" ? "none" : "inline-block";
 
     if (submitPanel) submitPanel.style.display = name === "GAMEOVER" ? "flex" : "none";
-    //if (highscoresBox) highscoresBox.style.display = name === "SCORES" ? "block" : "none";
-
     if (submitMsg) {
         submitMsg.textContent = "";
         submitMsg.classList.remove("error");
@@ -109,6 +146,8 @@ function setScreen(name) {
 
 function startGame() {
     resetGame();
+    showScreen("GAME");
+    setScoresOpen(false);
     setScreen("PLAY");
     updateMusic();
 }
@@ -117,18 +156,20 @@ function gameOver() {
     if (GAME.over) return;
     GAME.over = true;
 
-    try {
-        audio.music.pause();
-    } catch {}
-
+    try { audio.music.pause(); } catch {}
     if (musicToggle ? musicToggle.checked : true) {
-        try {
-            audio.over.currentTime = 0;
-            audio.over.play().catch(() => {});
-        } catch {}
+        try { audio.over.currentTime = 0; audio.over.play().catch(()=>{}); } catch {}
     }
 
     setScreen("GAMEOVER");
+    showScreen("SCORE");
+
+    const sec = Math.floor(GAME.elapsedMs / 1000);
+    if (finalStats) {
+        finalStats.textContent = `Time survived: ${sec}s | Level reached: ${GAME.level}`;
+    }
+
+    setScoresOpen(true);
 }
 
 function secondsSurvived() {
@@ -195,6 +236,7 @@ function update(dt) {
         spawnEnemy();
         GAME.spawnTimerMs = spawnInterval;
     }
+    updateNearSfx(dt);
 
     for (const e of GAME.enemies) {
         const dx = GAME.player.x - e.x;
@@ -205,7 +247,6 @@ function update(dt) {
         e.y += (dy / d) * e.speed * dt;
 
         if (d < GAME.player.r + e.r) {
-            playHit();
             gameOver();
             return;
         }
@@ -222,18 +263,17 @@ function drawSpriteOrCircle(img, x, y, w, h, rFallback) {
     }
 }
 
+function stopGameOverSound() {
+    if (!audio || !audio.over) return;
+    try {
+        audio.over.pause();
+        audio.over.currentTime = 0;
+    } catch {}
+}
+
 function drawTitle() {
+    updateMusic();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = "#ff0000";
-    ctx.font = "28px Arial";
-    ctx.fillText("Survival Game", 290, 210);
-
-    ctx.font = "16px Arial";
-    ctx.fillText("Don't let John Pork get to the phone", 255, 245);
-    ctx.fillStyle = "#e1e1e1";
-    ctx.fillText("WASD / Arrows to move", 295, 270);
-    ctx.fillText("Press Enter or click Start", 293, 295);
 }
 
 function drawPlay() {
@@ -261,25 +301,10 @@ function drawGameOver() {
         const w = 500, h = 500;
         ctx.drawImage(ASSETS.over, (canvas.width - w)/2, 0, w, h);
     }
-
-    const sec = secondsSurvived();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "26px Arial";
-    ctx.fillText("Game Over", 320, 170);
-
-    ctx.font = "16px Arial";
-    ctx.fillText(`Your time: ${sec}s`, 340, 220);
-    ctx.fillText(`Level reached: ${GAME.level}`, 325, 245);
-    ctx.fillText("Submit score below", 315, 305);
 }
 
 function drawScores() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = "#e7e7e7";
-    ctx.font = "14px Arial";
-    ctx.fillText("Press Restart to play again (or Enter for title)", 230, 280);
 }
 
 function clientValidateName(name) {
@@ -290,22 +315,18 @@ function clientValidateName(name) {
 }
 
 let scoresOpen = false;
+let hsPage = 1;
+const hsSize = 10;
 
 function setScoresOpen(open) {
     scoresOpen = open;
-
-    if (highscoresBox) highscoresBox.style.display = open ? "block" : "none";
+    if (highscoresBox) highscoresBox.classList.toggle("hidden", !open);
     if (scoresToggleBtn) scoresToggleBtn.textContent = open ? "Close" : "Scores";
-
-    if (open) {
-        loadHighScores(1);
-    }
+    if (open) loadHighScores(1);
 }
 
 if (scoresToggleBtn) {
-    scoresToggleBtn.addEventListener("click", () => {
-        setScoresOpen(!scoresOpen);
-    });
+    scoresToggleBtn.addEventListener("click", () => setScoresOpen(!scoresOpen));
 }
 
 async function submitScore() {
@@ -338,6 +359,7 @@ async function submitScore() {
         }
 
         submitMsg.textContent = "Saved!";
+        showHighScores(true);
         setScoresOpen(true);
     } catch {
         submitMsg.textContent = "Network error.";
@@ -345,23 +367,29 @@ async function submitScore() {
     }
 }
 
-if (submitBtn) submitBtn.addEventListener("click", submitScore);
-
-if (startBtn) startBtn.addEventListener("click", startGame);
-
-if (restartBtn) {
-    restartBtn.addEventListener("click", () => {
-        try {
-            audio.music.pause();
-            audio.music.currentTime = 0;
-        } catch {}
-        setScoresOpen(false);
-        setScreen("TITLE");
+if (submitBtn) {
+    submitBtn.addEventListener("click", () => {
+        submitScore()
     });
 }
+if (startBtn) startBtn.addEventListener("click", startGame);
 
-let hsPage = 1;
-const hsSize = 10;
+if (restartBtn)restartBtn.addEventListener("click", () => {
+    try { audio.music.pause(); audio.music.currentTime = 0; } catch {}
+    try { audio.over.pause(); audio.over.currentTime = 0; } catch {}
+    setScoresOpen(false);
+    setScreen("TITLE");
+    showScreen("TITLE");
+});
+
+if (backToTitleBtn){
+    backToTitleBtn.addEventListener("click", () => {
+        stopGameOverSound();
+        setScoresOpen(false);
+        setScreen("TITLE");
+        showScreen("TITLE");
+    });
+}
 
 function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
@@ -436,5 +464,7 @@ function loop(t) {
     requestAnimationFrame(loop);
 }
 
+showScreen("TITLE");
+setScoresOpen(false);
 setScreen("TITLE");
 requestAnimationFrame(loop);

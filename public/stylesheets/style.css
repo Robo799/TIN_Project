@@ -138,7 +138,6 @@ input::placeholder {
     opacity: 0.8;
 }
 
-/* Make it usable on smaller screens */
 @media (max-width: 880px) {
     #ui, #submitPanel, #highscores {
         width: 100%;
@@ -153,3 +152,46 @@ input::placeholder {
         grid-template-columns: 40px 1fr 90px 80px 140px;
     }
 }
+
+.hidden { display: none !important; }
+.screen { width: 820px; display: grid; gap: 12px; justify-items: center; }
+
+#ui {
+    width: 820px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+#ui .left, #ui .right { display: flex; align-items: center; gap: 10px; }
+
+#highscores {
+    width: 820px;
+    margin-top: 12px;
+    border: 1px solid #233155;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+#highscoresHeader {
+    padding: 10px 12px;
+    background: #101a32;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#highscoresList { padding: 10px 12px; }
+
+.row {
+    display: grid;
+    grid-template-columns: 50px 1fr 120px 120px 180px;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #1d294a;
+    align-items: center;
+}
+.row:last-child { border-bottom: none; }
+
+.error { color: #ffb4b4; }
