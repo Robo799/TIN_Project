@@ -28,10 +28,14 @@ const ASSETS = {
     player: new Image(),
     enemy: new Image(),
     over: new Image(),
+    boss: new Image(),
+    lure: new Image(),
 };
 ASSETS.player.src = "/images/player.png";
 ASSETS.enemy.src = "/images/enemy.png";
 ASSETS.over.src = "/images/over.png";
+ASSETS.boss.src = "/images/boss.png";
+ASSETS.lure.src = "/images/lure.png";
 
 const audio = {
     music: new Audio("/images/music.mp3"),
@@ -94,6 +98,14 @@ const STATE = {
 const GAME = {
     player: { x: 0, y: 0, r: 18, speed: 230 },
     enemies: [],
+    boss: null,
+    bossSpawned: false,
+    baseBossSpeed: 170,
+    bossRadius: 70,
+    lure: null,
+    lureSpawned: false,
+    lureSpeed: 250,
+    lureRadius: 14,
     startMs: 0,
     elapsedMs: 0,
     level: 1,
@@ -102,6 +114,8 @@ const GAME = {
     baseSpawnMs: 900,
     baseEnemySpeed: 95,
     over: false,
+    bossLevelSpawned: 0,
+    lureLevelSpawned: 0,
 };
 
 function clamp(v, a, b) {
@@ -112,12 +126,18 @@ function resetGame() {
     GAME.player.x = canvas.width / 2;
     GAME.player.y = canvas.height / 2;
     GAME.enemies = [];
+    GAME.boss = null;
+    GAME.bossSpawned = false;
+    GAME.lure = null;
+    GAME.lureSpawned = false;
     GAME.startMs = performance.now();
     GAME.elapsedMs = 0;
     GAME.level = 1;
     GAME.spawnTimerMs = 0;
     GAME.over = false;
     nearBeepCooldownMs = 0;
+    GAME.bossLevelSpawned = 0;
+    GAME.lureLevelSpawned = 0;
 }
 
 function showScreen(which) {
@@ -177,7 +197,7 @@ function secondsSurvived() {
 }
 
 function computeLevel(elapsedMs) {
-    return 1 + Math.floor(elapsedMs / 15000);
+    return 1 + Math.floor(elapsedMs / 10000);
 }
 
 function spawnEnemy() {
@@ -192,6 +212,50 @@ function spawnEnemy() {
     const speed = GAME.baseEnemySpeed + (GAME.level - 1) * 18;
 
     GAME.enemies.push({ x, y, r: 16, speed });
+}
+
+function spawnBoss() {
+    const side = Math.floor(Math.random() * 4);
+    let x, y;
+
+    if (side === 0) { x = 0; y = Math.random() * canvas.height; }
+    if (side === 1) { x = canvas.width; y = Math.random() * canvas.height; }
+    if (side === 2) { x = Math.random() * canvas.width; y = 0; }
+    if (side === 3) { x = Math.random() * canvas.width; y = canvas.height; }
+
+    GAME.boss = {
+        x, y,
+        r: GAME.bossRadius,
+        speed: GAME.baseBossSpeed + (GAME.level - 2) * 25,
+    };
+    GAME.bossSpawned = true;
+}
+
+function spawnLure() {
+    const x = canvas.width / 2 + (Math.random() * 120 - 60);
+    const y = canvas.height / 2 + (Math.random() * 120 - 60);
+
+    const side = Math.floor(Math.random() * 4);
+    let tx, ty;
+
+    if (side === 0) { tx = 0; ty = Math.random() * canvas.height; }
+    if (side === 1) { tx = canvas.width; ty = Math.random() * canvas.height; }
+    if (side === 2) { tx = Math.random() * canvas.width; ty = 0; }
+    if (side === 3) { tx = Math.random() * canvas.width; ty = canvas.height; }
+
+    const dx = tx - x;
+    const dy = ty - y;
+    const d = Math.hypot(dx, dy) || 1;
+
+    GAME.lure = {
+        x, y,
+        vx: dx / d,
+        vy: dy / d,
+        r: GAME.lureRadius,
+        side,
+    };
+
+    GAME.lureSpawned = true;
 }
 
 const keys = new Set();
@@ -217,6 +281,19 @@ function update(dt) {
     const now = performance.now();
     GAME.elapsedMs = now - GAME.startMs;
     GAME.level = computeLevel(GAME.elapsedMs);
+    if (GAME.level >= 2 && GAME.level % 2 === 0) {
+        if (!GAME.boss && GAME.bossLevelSpawned !== GAME.level) {
+            spawnBoss();
+            GAME.bossLevelSpawned = GAME.level;
+        }
+    }
+
+    if (GAME.level >= 3 && GAME.level % 2 === 1) {
+        if (GAME.boss && !GAME.lure && GAME.lureLevelSpawned !== GAME.level) {
+            spawnLure();
+            GAME.lureLevelSpawned = GAME.level;
+        }
+    }
 
     let vx = 0, vy = 0;
     if (keys.has("w") || keys.has("arrowup")) vy -= 1;
@@ -233,24 +310,97 @@ function update(dt) {
     const spawnInterval = Math.max(220, GAME.baseSpawnMs - (GAME.level - 1) * 80);
     GAME.spawnTimerMs -= dt * 1000;
     if (GAME.spawnTimerMs <= 0) {
-        spawnEnemy();
-        GAME.spawnTimerMs = spawnInterval;
+        if(!GAME.boss) {
+            spawnEnemy();
+            GAME.spawnTimerMs = spawnInterval;
+        } else {
+            GAME.spawnTimerMs = 400;
+        }
     }
     updateNearSfx(dt);
 
-    for (const e of GAME.enemies) {
-        const dx = GAME.player.x - e.x;
-        const dy = GAME.player.y - e.y;
+    if (GAME.boss) {
+        const bx = GAME.boss.x;
+        const by = GAME.boss.y;
+
+        const targetX = GAME.lure ? GAME.lure.x : GAME.player.x;
+        const targetY = GAME.lure ? GAME.lure.y : GAME.player.y;
+
+        const dx = targetX - bx;
+        const dy = targetY - by;
         const d = Math.hypot(dx, dy) || 1;
 
-        e.x += (dx / d) * e.speed * dt;
-        e.y += (dy / d) * e.speed * dt;
+        GAME.boss.x += (dx / d) * GAME.boss.speed * dt;
+        GAME.boss.y += (dy / d) * GAME.boss.speed * dt;
 
-        if (d < GAME.player.r + e.r) {
+        GAME.boss.x = clamp(GAME.boss.x, GAME.boss.r, canvas.width - GAME.boss.r);
+        GAME.boss.y = clamp(GAME.boss.y, GAME.boss.r, canvas.height - GAME.boss.r);
+
+        if (d < GAME.player.r + GAME.boss.r) {
             gameOver();
             return;
         }
     }
+
+    if (GAME.lure) {
+        GAME.lure.x += GAME.lure.vx * GAME.lureSpeed * dt;
+        GAME.lure.y += GAME.lure.vy * GAME.lureSpeed * dt;
+
+        const eps = 2;
+        let lureAtEdge = false;
+
+        if (GAME.lure.side === 0 && GAME.lure.x <= 0 + eps) lureAtEdge = true;
+        if (GAME.lure.side === 1 && GAME.lure.x >= canvas.width - eps) lureAtEdge = true;
+        if (GAME.lure.side === 2 && GAME.lure.y <= 0 + eps) lureAtEdge = true;
+        if (GAME.lure.side === 3 && GAME.lure.y >= canvas.height - eps) lureAtEdge = true;
+
+        if (lureAtEdge && GAME.boss) {
+            const bossAtEdge =
+                (GAME.lure.side === 0 && GAME.boss.x <= GAME.boss.r + 3) ||
+                (GAME.lure.side === 1 && GAME.boss.x >= canvas.width - GAME.boss.r - 3) ||
+                (GAME.lure.side === 2 && GAME.boss.y <= GAME.boss.r + 3) ||
+                (GAME.lure.side === 3 && GAME.boss.y >= canvas.height - GAME.boss.r - 3);
+
+            const bossNearLure = Math.hypot(GAME.boss.x - GAME.lure.x, GAME.boss.y - GAME.lure.y) < (GAME.boss.r + GAME.lure.r + 6);
+
+            if (bossAtEdge || bossNearLure) {
+                GAME.boss = null;
+                GAME.lure = null;
+            }
+        }
+    }
+
+    const margin = 60;
+    const fleeBoost = 140;
+
+    for (const e of GAME.enemies) {
+        if (GAME.boss) {
+            const dx = e.x - GAME.boss.x;
+            const dy = e.y - GAME.boss.y;
+            const d = Math.hypot(dx, dy) || 1;
+
+            const fleeSpeed = e.speed + fleeBoost;
+            e.x += (dx / d) * fleeSpeed * dt;
+            e.y += (dy / d) * fleeSpeed * dt;
+        } else {
+            const dx = GAME.player.x - e.x;
+            const dy = GAME.player.y - e.y;
+            const d = Math.hypot(dx, dy) || 1;
+
+            e.x += (dx / d) * e.speed * dt;
+            e.y += (dy / d) * e.speed * dt;
+
+            if (d < GAME.player.r + e.r) {
+                gameOver();
+                return;
+            }
+        }
+    }
+
+    GAME.enemies = GAME.enemies.filter(e =>
+        e.x >= -margin && e.x <= canvas.width + margin &&
+        e.y >= -margin && e.y <= canvas.height + margin
+    );
 }
 
 function drawSpriteOrCircle(img, x, y, w, h, rFallback) {
@@ -288,6 +438,14 @@ function drawPlay() {
 
     ctx.fillStyle = "#e7e7e7";
     drawSpriteOrCircle(ASSETS.player, GAME.player.x, GAME.player.y, 42, 42, GAME.player.r);
+
+    if (GAME.boss) {
+        drawSpriteOrCircle(ASSETS.boss, GAME.boss.x, GAME.boss.y, 140, 140, GAME.boss.r);
+    }
+
+    if (GAME.lure) {
+        drawSpriteOrCircle(ASSETS.lure, GAME.lure.x, GAME.lure.y, 60, 40, GAME.lure.r);
+    }
 
     for (const e of GAME.enemies) {
         drawSpriteOrCircle(ASSETS.enemy, e.x, e.y, 38, 38, e.r);
