@@ -336,7 +336,8 @@ function update(dt) {
         GAME.boss.x = clamp(GAME.boss.x, GAME.boss.r, canvas.width - GAME.boss.r);
         GAME.boss.y = clamp(GAME.boss.y, GAME.boss.r, canvas.height - GAME.boss.r);
 
-        if (d < GAME.player.r + GAME.boss.r) {
+        const dp = Math.hypot(GAME.boss.x - GAME.player.x, GAME.boss.y - GAME.player.y) || 1;
+        if (dp < GAME.player.r + GAME.boss.r) {
             gameOver();
             return;
         }
